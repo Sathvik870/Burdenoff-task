@@ -1,65 +1,65 @@
-import { prisma } from "../lib/prisma";
-import { validateRequiredText, validateSlug } from "../lib/validation"
+import { collectionService } from "../services/collection.service";
+import { documentService } from "../services/document.service";
+
 export const resolvers = {
-    
-  //query
   Query: {
-    collections: async () => {
-      return prisma.collection.findMany({
-        orderBy: {
-          createdAt: "desc",
-        },
-      });
+    collections: () => {
+      return collectionService.getCollections();
     },
 
-    collection: async (
+    collection: (
       _: unknown,
       args: { id: string },
     ) => {
-      return prisma.collection.findUnique({
-        where: {
-          id: args.id,
-        },
-      });
+      return collectionService.getCollectionById(args.id);
     },
   },
 
-  //collections
   Collection: {
     createdAt: (collection: { createdAt: Date }) => {
       return collection.createdAt.toISOString();
     },
 
     documents: async (collection: { id: string }) => {
-      return prisma.document.findMany({
-        where: {
-          collectionId: collection.id,
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-      });
+      return documentService.getDocumentsByCollectionId(collection.id);
     },
   },
-  
-  //mutations
+
+  Document: {
+    createdAt: (document: { createdAt: Date }) => {
+      return document.createdAt.toISOString();
+    },
+  },
+
   Mutation: {
-    createCollection: async (
-        _: unknown,
-        args: {
+    createCollection: (
+      _: unknown,
+      args: {
         name: string;
         slug: string;
-        },
+      },
     ) => {
-        validateRequiredText(args.name, "Collection name");
-        validateSlug(args.slug);
+      return collectionService.createCollection(
+        args.name,
+        args.slug,
+      );
+    },
 
-        return prisma.collection.create({
-        data: {
-            name: args.name.trim(),
-            slug: args.slug,
-        },
-        });
+    createDocument: (
+      _: unknown,
+      args: {
+        title: string;
+        content: string;
+        tags?: string[] | null;
+        collectionId: string;
+      },
+    ) => {
+      return documentService.createDocument(
+        args.title,
+        args.content,
+        args.tags,
+        args.collectionId,
+      );
     },
-    },
+  },
 };
