@@ -1,18 +1,53 @@
-export function validateRequiredText(
+import { AppError } from "../errors/app-error";
+import type { Result } from "../types/result";
+
+export const validateRequiredText = (
   value: string,
   fieldName: string,
-): void {
-  if (value.trim().length === 0) {
-    throw new Error(`${fieldName} cannot be empty`);
-  }
-}
+): Result<string> => {
+  const normalizedValue = value.trim();
 
-export function validateSlug(slug: string): void {
+  if (normalizedValue.length === 0) {
+    const error = new AppError(
+      "VALIDATION_ERROR",
+      `${fieldName} cannot be empty`,
+      400,
+    );
+
+    return {
+      success: false,
+      error,
+    };
+  }
+
+  return {
+    success: true,
+    data: normalizedValue,
+  };
+};
+
+export const validateSlug = (
+  slug: string,
+): Result<string> => {
+  const normalizedSlug = slug.trim();
+
   const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-  if (!slugPattern.test(slug)) {
-    throw new Error(
-      "Slug must contain only lowercase letters, numbers, and single hyphens",
+  if (!slugPattern.test(normalizedSlug)) {
+    const error = new AppError(
+      "VALIDATION_ERROR",
+      "Slug must contain only lowercase letters, numbers, and hyphens",
+      400,
     );
+
+    return {
+      success: false,
+      error,
+    };
   }
-}
+
+  return {
+    success: true,
+    data: normalizedSlug,
+  };
+};
