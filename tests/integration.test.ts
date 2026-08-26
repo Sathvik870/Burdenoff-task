@@ -1,7 +1,14 @@
-import { describe, expect, test } from "bun:test";
+import {
+  afterAll,
+  beforeAll,
+  describe,
+  expect,
+  test,
+} from "bun:test";
 import { createSchema, createYoga } from "graphql-yoga";
 import { readFileSync } from "node:fs";
 
+import { prisma } from "../src/lib/prisma";
 import { resolvers } from "../src/schema/resolvers";
 
 const typeDefs = readFileSync(
@@ -18,7 +25,10 @@ const yoga = createYoga({
   schema,
 });
 
-const request = async (query: string, variables?: Record<string, unknown>) => {
+const request = async (
+  query: string,
+  variables?: Record<string, unknown>,
+) => {
   return yoga.fetch("http://localhost/graphql", {
     method: "POST",
     headers: {
@@ -30,6 +40,73 @@ const request = async (query: string, variables?: Record<string, unknown>) => {
     }),
   });
 };
+
+let collectionId: string;
+let secondCollectionId: string;
+
+beforeAll(async () => {
+  const collection = await prisma.collection.create({
+    data: {
+      name: "Integration Test Collection",
+      slug: `integration-test-${crypto.randomUUID()}`,
+    },
+  });
+
+  const secondCollection = await prisma.collection.create({
+    data: {
+      name: "Second Integration Collection",
+      slug: `integration-test-second-${crypto.randomUUID()}`,
+    },
+  });
+
+  collectionId = collection.id;
+  secondCollectionId = secondCollection.id;
+
+  await prisma.document.createMany({
+    data: [
+      {
+        title: "Bank Statement",
+        content: "September bank statement",
+        tags: ["bank", "statement"],
+        collectionId,
+        isArchived: false,
+      },
+      {
+        title: "Bank Account Details",
+        content: "Bank account information",
+        tags: ["bank"],
+        collectionId,
+        isArchived: false,
+      },
+      {
+        title: "Archived Bank Document",
+        content: "Old bank document",
+        tags: ["bank", "archived"],
+        collectionId,
+        isArchived: true,
+      },
+      {
+        title: "Insurance Policy",
+        content: "Home insurance policy",
+        tags: ["insurance"],
+        collectionId: secondCollectionId,
+        isArchived: false,
+      },
+    ],
+  });
+});
+
+afterAll(async () => {
+  await prisma.collection.deleteMany({
+    where: {
+      id: {
+        in: [collectionId, secondCollectionId],
+      },
+    },
+  });
+
+  await prisma.$disconnect();
+});
 
 describe("GraphQL Integration Tests", () => {
   test("fetches all collections", async () => {
@@ -50,19 +127,25 @@ describe("GraphQL Integration Tests", () => {
 
     expect(result.errors).toBeUndefined();
     expect(result.data.collections).toBeArray();
+    expect(result.data.collections.length).toBeGreaterThanOrEqual(2);
   });
 
   test("fetches collection by id", async () => {
-    const response = await request(`
-      query {
-        collection(id: "d0132f9c-0f81-433b-900f-524c6018393a") {
-          id
-          name
-          slug
-          createdAt
+    const response = await request(
+      `
+        query($id: ID!) {
+          collection(id: $id) {
+            id
+            name
+            slug
+            createdAt
+          }
         }
-      }
-    `);
+      `,
+      {
+        id: collectionId,
+      },
+    );
 
     expect(response.status).toBe(200);
 
@@ -70,21 +153,26 @@ describe("GraphQL Integration Tests", () => {
 
     expect(result.errors).toBeUndefined();
     expect(result.data.collection).not.toBeNull();
-    expect(result.data.collection.id).toBe(
-      "d0132f9c-0f81-433b-900f-524c6018393a",
-    );
+    expect(result.data.collection.id).toBe(collectionId);
   });
 
   test("returns null for non-existent collection", async () => {
-    const response = await request(`
-      query {
-        collection(id: "00000000-0000-0000-0000-000000000000") {
-          id
-          name
-          slug
+    const nonExistentCollectionId = crypto.randomUUID();
+
+    const response = await request(
+      `
+        query($id: ID!) {
+          collection(id: $id) {
+            id
+            name
+            slug
+          }
         }
-      }
-    `);
+      `,
+      {
+        id: nonExistentCollectionId,
+      },
+    );
 
     expect(response.status).toBe(200);
 
@@ -119,23 +207,27 @@ describe("GraphQL Integration Tests", () => {
     expect(result.errors).toBeUndefined();
     expect(result.data.documents).toBeDefined();
     expect(result.data.documents.items).toBeArray();
+    expect(result.data.documents.items.length).toBeGreaterThan(0);
   });
 
   test("fetches documents by collection", async () => {
-    const response = await request(`
-      query {
-        documents(
-          collectionId: "d0132f9c-0f81-433b-900f-524c6018393a"
-        ) {
-          items {
-            id
-            title
-            collectionId
+    const response = await request(
+      `
+        query($collectionId: ID!) {
+          documents(collectionId: $collectionId) {
+            items {
+              id
+              title
+              collectionId
+            }
+            nextCursor
           }
-          nextCursor
         }
-      }
-    `);
+      `,
+      {
+        collectionId,
+      },
+    );
 
     expect(response.status).toBe(200);
 
@@ -143,27 +235,31 @@ describe("GraphQL Integration Tests", () => {
 
     expect(result.errors).toBeUndefined();
     expect(result.data.documents.items).toBeArray();
+    expect(result.data.documents.items.length).toBeGreaterThan(0);
 
     for (const document of result.data.documents.items) {
-      expect(document.collectionId).toBe(
-        "d0132f9c-0f81-433b-900f-524c6018393a",
-      );
+      expect(document.collectionId).toBe(collectionId);
     }
   });
 
   test("searches documents by title or content", async () => {
-    const response = await request(`
-      query {
-        documents(search: "Bank") {
-          items {
-            id
-            title
-            content
+    const response = await request(
+      `
+        query($search: String!) {
+          documents(search: $search) {
+            items {
+              id
+              title
+              content
+            }
+            nextCursor
           }
-          nextCursor
         }
-      }
-    `);
+      `,
+      {
+        search: "Bank",
+      },
+    );
 
     expect(response.status).toBe(200);
 
@@ -171,6 +267,17 @@ describe("GraphQL Integration Tests", () => {
 
     expect(result.errors).toBeUndefined();
     expect(result.data.documents.items).toBeArray();
+    expect(result.data.documents.items.length).toBeGreaterThan(0);
+
+    for (const document of result.data.documents.items) {
+      const title = document.title.toLowerCase();
+      const content = document.content.toLowerCase();
+
+      expect(
+        title.includes("bank") ||
+          content.includes("bank"),
+      ).toBe(true);
+    }
   });
 
   test("filters documents by archived status", async () => {
@@ -193,6 +300,7 @@ describe("GraphQL Integration Tests", () => {
 
     expect(result.errors).toBeUndefined();
     expect(result.data.documents.items).toBeArray();
+    expect(result.data.documents.items.length).toBeGreaterThan(0);
 
     for (const document of result.data.documents.items) {
       expect(document.isArchived).toBe(false);
@@ -217,6 +325,7 @@ describe("GraphQL Integration Tests", () => {
     const result = await response.json();
 
     expect(result.errors).toBeUndefined();
+    expect(result.data.documents.items).toBeArray();
     expect(result.data.documents.items.length).toBeLessThanOrEqual(2);
   });
 
@@ -265,13 +374,15 @@ describe("GraphQL Integration Tests", () => {
       expect(secondResult.errors).toBeUndefined();
       expect(secondResult.data.documents.items).toBeArray();
 
-      const firstPageIds = firstResult.data.documents.items.map(
-        (document: { id: string }) => document.id,
-      );
+      const firstPageIds =
+        firstResult.data.documents.items.map(
+          (document: { id: string }) => document.id,
+        );
 
-      const secondPageIds = secondResult.data.documents.items.map(
-        (document: { id: string }) => document.id,
-      );
+      const secondPageIds =
+        secondResult.data.documents.items.map(
+          (document: { id: string }) => document.id,
+        );
 
       for (const id of secondPageIds) {
         expect(firstPageIds).not.toContain(id);
@@ -280,25 +391,34 @@ describe("GraphQL Integration Tests", () => {
   });
 
   test("handles combined filters", async () => {
-    const response = await request(`
-      query {
-        documents(
-          collectionId: "d0132f9c-0f81-433b-900f-524c6018393a"
-          search: "Bank"
-          isArchived: false
-          take: 5
+    const response = await request(
+      `
+        query(
+          $collectionId: ID!
+          $search: String!
         ) {
-          items {
-            id
-            title
-            content
-            collectionId
-            isArchived
+          documents(
+            collectionId: $collectionId
+            search: $search
+            isArchived: false
+            take: 5
+          ) {
+            items {
+              id
+              title
+              content
+              collectionId
+              isArchived
+            }
+            nextCursor
           }
-          nextCursor
         }
-      }
-    `);
+      `,
+      {
+        collectionId,
+        search: "Bank",
+      },
+    );
 
     expect(response.status).toBe(200);
 
@@ -308,18 +428,25 @@ describe("GraphQL Integration Tests", () => {
     expect(result.data.documents.items).toBeArray();
 
     for (const document of result.data.documents.items) {
-      expect(document.collectionId).toBe(
-        "d0132f9c-0f81-433b-900f-524c6018393a",
-      );
-
+      expect(document.collectionId).toBe(collectionId);
       expect(document.isArchived).toBe(false);
+
+      const title = document.title.toLowerCase();
+      const content = document.content.toLowerCase();
+
+      expect(
+        title.includes("bank") ||
+          content.includes("bank"),
+      ).toBe(true);
     }
   });
 
   test("returns empty result for a search with no matches", async () => {
     const response = await request(`
       query {
-        documents(search: "THIS_DOCUMENT_SHOULD_NOT_EXIST_123456") {
+        documents(
+          search: "THIS_DOCUMENT_SHOULD_NOT_EXIST_123456"
+        ) {
           items {
             id
             title
@@ -338,7 +465,7 @@ describe("GraphQL Integration Tests", () => {
     expect(result.data.documents.nextCursor).toBeNull();
   });
 
-  test("returns validation error for invalid take value", async () => {
+  test("clamps take to the minimum value", async () => {
     const response = await request(`
       query {
         documents(take: 0) {
@@ -356,5 +483,6 @@ describe("GraphQL Integration Tests", () => {
 
     expect(result.errors).toBeUndefined();
     expect(result.data.documents.items).toBeArray();
+    expect(result.data.documents.items.length).toBeGreaterThanOrEqual(1);
   });
 });
