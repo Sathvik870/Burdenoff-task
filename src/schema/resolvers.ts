@@ -1,17 +1,22 @@
 import { collectionService } from "../services/collection.service";
 import { documentService } from "../services/document.service";
 
-export const resolvers = {
+export const createResolvers = (
+  services = {
+    collectionService,
+    documentService,
+  },
+) => ({
   Query: {
     collections: () => {
-      return collectionService.getCollections();
+      return services.collectionService.getCollections();
     },
 
     collection: (
       _: unknown,
       args: { id: string },
     ) => {
-      return collectionService.getCollectionById(args.id);
+      return services.collectionService.getCollectionById(args.id);
     },
 
     documents: (
@@ -24,7 +29,7 @@ export const resolvers = {
         cursor?: string | null;
       },
     ) => {
-      return documentService.getDocuments(args);
+      return services.documentService.getDocuments(args);
     },
   },
 
@@ -34,7 +39,9 @@ export const resolvers = {
     },
 
     documents: async (collection: { id: string }) => {
-      return documentService.getDocumentsByCollectionId(collection.id);
+      return services.documentService.getDocumentsByCollectionId(
+        collection.id,
+      );
     },
   },
 
@@ -52,7 +59,7 @@ export const resolvers = {
         slug: string;
       },
     ) => {
-      return collectionService.createCollection(
+      return services.collectionService.createCollection(
         args.name,
         args.slug,
       );
@@ -67,7 +74,7 @@ export const resolvers = {
         collectionId: string;
       },
     ) => {
-      return documentService.createDocument(
+      return services.documentService.createDocument(
         args.title,
         args.content,
         args.tags,
@@ -85,7 +92,7 @@ export const resolvers = {
         isArchived?: boolean | null;
       },
     ) => {
-      return documentService.updateDocument(
+      return services.documentService.updateDocument(
         args.id,
         args.title,
         args.content,
@@ -98,7 +105,7 @@ export const resolvers = {
       _: unknown,
       args: { id: string },
     ) => {
-      return documentService.deleteDocument(args.id);
+      return services.documentService.deleteDocument(args.id);
     },
 
     moveDocument: (
@@ -108,10 +115,12 @@ export const resolvers = {
         collectionId: string;
       },
     ) => {
-      return documentService.moveDocument(
+      return services.documentService.moveDocument(
         args.id,
         args.collectionId,
       );
     },
   },
-};
+});
+
+export const resolvers = createResolvers();

@@ -3,9 +3,18 @@
   "module": "index.ts",
   "type": "module",
   "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "gendb": "prisma generate",
+    "dev": "bun --watch src/server.ts",
+    "test": "bun test"
+  },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/bun": "latest",
-    "prisma": "7.9.1"
+    "eslint": "^10.9.1",
+    "prisma": "7.9.1",
+    "typescript-eslint": "^8.68.0"
   },
   "peerDependencies": {
     "typescript": "^7"
