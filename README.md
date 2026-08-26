@@ -240,16 +240,21 @@ The included Docker setup creates the following database and credentials:
 The following setup works for a local development environment:
 
 ```bash
-docker compose up -d && bun install && bunx prisma generate && bunx prisma migrate dev --name init && bun run dev
+docker compose up --build
 ```
 
 ### What this does
 
 - starts PostgreSQL in Docker
-- installs dependencies
-- generates Prisma client
-- applies the database schema
-- launches the GraphQL server in watch mode
+- builds the app container if needed
+- runs the Dockerized API with Prisma migrations applied automatically
+- keeps the local development stack bootstrapped with a single command
+
+### Local Bun Development
+
+```bash
+docker compose up -d && bun install && bunx prisma generate && bunx prisma migrate dev --name init && bun run dev
+```
 
 If you prefer a split setup, you can run the commands separately.
 
@@ -292,6 +297,8 @@ bunx prisma format
 ### Current migration summary
 
 The project already includes an initial migration for the `Collection` and `Document` tables.
+
+The Dockerized API runs `prisma migrate deploy` when the container starts, ensuring a fresh PostgreSQL instance is initialized from the committed migrations.
 
 ---
 
@@ -585,6 +592,118 @@ Here are strong next-step enhancements for this backend:
   - GraphQL codegen for typed client generation
   - Apollo or GraphQL Inspector integration
   - richer integration test suites with seeded fixtures
+
+---
+
+## 16. CI / GitHub Actions
+
+This project includes a GitHub Actions workflow for continuous integration and validation on the main branch.
+
+### Workflow file
+
+- `.github/workflows/ci.yml`
+
+### Trigger conditions
+
+The workflow runs on:
+
+- pull requests targeting `main`
+- pushes to `main`
+
+### Pipeline overview
+
+The CI pipeline is designed to verify that the project builds and passes checks before merging code.
+
+```yaml
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+
+  push:
+    branches:
+      - main
+```
+
+### Job: `test`
+
+The `test` job runs on `ubuntu-latest` and starts a PostgreSQL service using the same database settings used by the application.
+
+#### PostgreSQL service
+
+```yaml
+services:
+  postgres:
+    image: postgres:17
+    env:
+      POSTGRES_USER: document_vault
+      POSTGRES_PASSWORD: Vault#123
+      POSTGRES_DB: document_vault
+    ports:
+      - 5432:5432
+```
+
+This ensures the database is available for Prisma migration and test execution during the CI run.
+
+### Environment variables
+
+```yaml
+env:
+  DATABASE_URL: postgresql://document_vault:Vault#123@localhost:5432/document_vault
+```
+
+### CI steps
+
+The workflow executes the following in order:
+
+1. Checkout repository
+2. Set up Bun
+3. Install dependencies with `bun install --frozen-lockfile`
+4. Generate Prisma client with `bun run gendb`
+5. Apply migrations with `bunx prisma migrate deploy`
+6. Run TypeScript type-checking with `bun run typecheck`
+7. Execute tests with `bun test`
+
+### Example workflow steps
+
+```yaml
+- name: Checkout repository
+  uses: actions/checkout@v4
+
+- name: Setup Bun
+  uses: oven-sh/setup-bun@v2
+  with:
+    bun-version: latest
+
+- name: Install dependencies
+  run: bun install --frozen-lockfile
+
+- name: Generate Prisma client
+  run: bun run gendb
+
+- name: Apply database migrations
+  run: bunx prisma migrate deploy
+
+- name: Typecheck
+  run: bun run typecheck
+
+- name: Run tests
+  run: bun test
+```
+
+### Why this CI setup matters
+
+This workflow protects the main branch by confirming that:
+
+- dependencies install cleanly
+- Prisma is generated successfully
+- database schema migrations are valid
+- TypeScript compilation passes
+- the GraphQL app behavior remains green under automated tests
+
+It is a strong baseline for ongoing project quality and safe merging.
 
 ---
 
