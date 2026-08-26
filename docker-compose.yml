@@ -5,13 +5,33 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: document_vault
-      # we can store this in secret but due to easy local setup we go with storing it in environment
-      POSTGRES_PASSWORD: Vault#123  
+      POSTGRES_PASSWORD: Vault#123
       POSTGRES_DB: document_vault
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U document_vault -d document_vault",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    container_name: document-vault-api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "postgresql://document_vault:Vault%23123@postgres:5432/document_vault"
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   postgres_data:
