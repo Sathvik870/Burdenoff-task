@@ -253,10 +253,7 @@ docker compose up --build
 ### Local Bun Development
 
 ```bash
-docker compose up -d
-bun install
-bun run gendb
-bun run dev
+docker compose up -d && bun install && bunx prisma generate && bunx prisma migrate dev --name init && bun run dev
 ```
 
 If you prefer a split setup, you can run the commands separately.
