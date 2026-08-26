@@ -8,7 +8,6 @@ export type AppErrorCode =
   | "INTERNAL_ERROR";
 
 export class AppError extends GraphQLError {
-  
   constructor(
     code: AppErrorCode,
     message: string,
@@ -16,7 +15,8 @@ export class AppError extends GraphQLError {
   ) {
     super(message, {
       extensions: {
-        code: "INTERNAL_SERVER_ERROR",
+        code,
+        httpStatus,
       },
     });
 

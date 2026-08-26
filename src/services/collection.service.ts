@@ -36,9 +36,12 @@ export const collectionService = {
 
       return collections;
     } catch (error: unknown) {
-      logger.error("Database connection failed", {
+      logger.error("Database operation failed", {
         operation: "getCollections",
-        error: "Database server is unreachable",
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unknown database error",
       });
 
       throw new AppError(
@@ -75,10 +78,13 @@ export const collectionService = {
 
       return collection;
     } catch (error: unknown) {
-      logger.error("Database connection failed", {
+      logger.error("Database operation failed", {
         operation: "getCollectionById",
         collectionId: id,
-        error: "Database server is unreachable",
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unknown database error",
       });
 
       throw new AppError(
@@ -155,7 +161,10 @@ export const collectionService = {
       logger.error("Database operation failed", {
         operation: "createCollection",
         slug: normalizedSlug,
-        error: "Database server is unreachable",
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unknown database error",
       });
 
       throw new AppError(

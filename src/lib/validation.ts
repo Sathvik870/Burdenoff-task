@@ -8,15 +8,13 @@ export const validateRequiredText = (
   const normalizedValue = value.trim();
 
   if (normalizedValue.length === 0) {
-    const error = new AppError(
-      "VALIDATION_ERROR",
-      `${fieldName} cannot be empty`,
-      400,
-    );
-
     return {
       success: false,
-      error,
+      error: new AppError(
+        "VALIDATION_ERROR",
+        `${fieldName} cannot be empty`,
+        400,
+      ),
     };
   }
 
@@ -34,15 +32,13 @@ export const validateSlug = (
   const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
   if (!slugPattern.test(normalizedSlug)) {
-    const error = new AppError(
-      "VALIDATION_ERROR",
-      "Slug must contain only lowercase letters, numbers, and hyphens",
-      400,
-    );
-
     return {
       success: false,
-      error,
+      error: new AppError(
+        "VALIDATION_ERROR",
+        "Slug must contain only lowercase letters, numbers, and hyphens",
+        400,
+      ),
     };
   }
 
